@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1433
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GPS Clock", "GPS Clock.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TinyGPSPlus-master-1.1.0", "..\libraries\TinyGPSPlus-master\TinyGPSPlus-master-1.1.0.vcxitems", "{E30E5863-E460-4799-A4DF-5E1C1961236E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ESP8266WiFi-1.0", "C:\Users\Buck\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\3.0.2\libraries\ESP8266WiFi\ESP8266WiFi-1.0.vcxitems", "{74578E4F-8D4D-4390-A3D0-DFB8118CD970}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SoftwareSerial-6.12.7", "C:\Users\Buck\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\3.0.2\libraries\SoftwareSerial\SoftwareSerial-6.12.7.vcxitems", "{B8A88086-F032-4EFF-BF40-0FF5DE408C9B}"
+EndProject
+Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		C:\Users\Buck\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\3.0.2\libraries\ESP8266WiFi\ESP8266WiFi-1.0.vcxitems*{74578e4f-8d4d-4390-a3d0-dfb8118cd970}*SharedItemsImports = 9
+		C:\Users\Buck\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\3.0.2\libraries\SoftwareSerial\SoftwareSerial-6.12.7.vcxitems*{b8a88086-f032-4eff-bf40-0ff5de408c9b}*SharedItemsImports = 9
+		C:\Users\Buck\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\3.0.2\libraries\ESP8266WiFi\ESP8266WiFi-1.0.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
+		C:\Users\Buck\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\3.0.2\libraries\SoftwareSerial\SoftwareSerial-6.12.7.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
+		..\libraries\TinyGPSPlus-master\TinyGPSPlus-master-1.1.0.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
+		..\libraries\TinyGPSPlus-master\TinyGPSPlus-master-1.1.0.vcxitems*{e30e5863-e460-4799-a4df-5e1c1961236e}*SharedItemsImports = 9
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.ActiveCfg = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EE6A30E5-88E1-4BBB-ADBC-95D1336CAC87}
+	EndGlobalSection
+EndGlobal

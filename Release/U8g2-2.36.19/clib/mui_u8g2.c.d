@@ -1,0 +1,6 @@
+C:\Users\Buck\AppData\Local\Temp\VMBuilds\GPS\ Clock\esp8266_nodemcuv2\Release\U8g2-2.36.19\clib\mui_u8g2.c.o: \
+ D:\Projects\Arduino\libraries\U8g2-2.36.19\src\clib\mui_u8g2.c \
+ D:\Projects\Arduino\libraries\U8g2-2.36.19\src\clib\mui.h \
+ D:\Projects\Arduino\libraries\U8g2-2.36.19\src\clib\u8g2.h \
+ D:\Projects\Arduino\libraries\U8g2-2.36.19\src\clib\u8x8.h \
+ D:\Projects\Arduino\libraries\U8g2-2.36.19\src\clib\mui_u8g2.h

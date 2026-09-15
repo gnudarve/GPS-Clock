@@ -1,0 +1,11 @@
+﻿# automatically created by Microsoft(R) Visual Studio.
+.vs/
+bin/
+obj/
+
+# build results
+
+# User-specific files
+*.suo
+*.user
+*.docstates
