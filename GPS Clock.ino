@@ -214,6 +214,20 @@ void resyncLocalClockFromGps() {
 	localClockSynced = true;
 }
 
+// Fixed-grid tick scheduler for the display refresh. Deliberately NOT a
+// blocking delay(1000) at the end of loop(): OLED redraw over bit-banged SW
+// I2C can itself take a non-trivial (and variable) number of milliseconds
+// to push a full 1024-byte framebuffer, so "draw, then delay(1000)" gives a
+// real loop period of (draw time) + 1000ms -- consistently over a second.
+// Since the epoch is only sampled once per loop pass, any pass whose total
+// period creeps past 2000ms causes a whole displayed second to be skipped,
+// even though the underlying millis()-based clock itself never drifts.
+// Scheduling the next tick as "previous tick + 1000ms" (not "now + 1000ms")
+// keeps this locked to a fixed 1Hz grid with no long-term drift, and
+// polling for it with a short delay (instead of blocking for a full
+// second) means we always catch the boundary within a few ms.
+unsigned long nextTickMs = 0;
+
 void loop() {
 	// Feed the parser one fully-framed sentence at a time.
 	while (GPSSerial.available() > 0) {
@@ -269,9 +283,21 @@ void loop() {
 		}
 	}
 
-	updateDisplay();
+	// Fire at (or very shortly after) each fixed 1000ms boundary, rather than
+	// sleeping for a full second regardless of how long the rest of the loop
+	// body took. (long) cast handles millis() rollover correctly.
+	if ((long)(millis() - nextTickMs) >= 0) {
+		updateDisplay();
+		nextTickMs += 1000; // next tick relative to the grid, not to "now" —
+							 // if we fired late, this doesn't push later ticks
+							 // out too; if we're badly behind (e.g. right after
+							 // a blocking WiFi call), the next few loop passes
+							 // catch up in quick succession instead of drifting.
+	}
 
-	delay(1000);
+	delay(5); // keep the loop responsive to the tick boundary without
+			  // busy-spinning; also yields time for the SDK's background
+			  // housekeeping (WiFi/RTOS), same as a delay(0)/yield() would.
 }
 
 // ---------- DISPLAY RENDERING ----------
@@ -326,7 +352,7 @@ void updateDisplay() {
 	snprintf(bigTime, sizeof(bigTime), "%02d:%02d:%02d", hh, mm, ss);
 	u8g2.setFont(u8g2_font_logisoso28_tn);
 	int bigW = u8g2.getUTF8Width(bigTime);
-	u8g2.drawStr((128 - bigW) / 2, 32, bigTime);
+	u8g2.drawStr((128 - bigW) / 2, 31, bigTime);
 
 	// --- Date line ---
 	char dateLine[24];
@@ -346,7 +372,7 @@ void updateDisplay() {
 		snprintf(locLine, sizeof(locLine), "location: --");
 	}
 	int locW = u8g2.getUTF8Width(locLine);
-	u8g2.drawStr((128 - locW) / 2, 52, locLine);
+	u8g2.drawStr((128 - locW) / 2, 54, locLine);
 
 	// --- Timezone + signal health line ---
 	char statusLine[28];
@@ -360,7 +386,7 @@ void updateDisplay() {
 	}
 	u8g2.setFont(u8g2_font_5x8_tf);
 	int statusW = u8g2.getUTF8Width(statusLine);
-	u8g2.drawStr((128 - statusW) / 2, 62, statusLine);
+	u8g2.drawStr((128 - statusW) / 2, 64, statusLine);
 
 	u8g2.sendBuffer();
 }
