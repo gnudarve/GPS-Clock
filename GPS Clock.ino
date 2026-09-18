@@ -63,11 +63,12 @@ const char* TIMEZONEDB_API_KEY = "K0P4MRQG7MB6";
 #define GPS_TX_PIN 5    // NodeMCU D1 -> wired to GPS RX (optional if not configuring module)
 #define GPS_BAUD   9600
 
-#define OLED_SCL_PIN 14 // NodeMCU D5
-#define OLED_SDA_PIN 12 // NodeMCU D6
+#define OLED_SCL_PIN 14 // NodeMCU D5 -> wired to OLED SCL
+#define OLED_SDA_PIN 12 // NodeMCU D6 -> wired to OLED SDA
 
-#define PIR_PIN 13      // NodeMCU D7 — free, no boot-strap constraints
-const unsigned long DISPLAY_TIMEOUT_MS = 30000UL; // blank after 30s of no motion
+#define PIR_PIN 13      // NodeMCU D7 -> wired to PIR sensor signal
+
+const unsigned long DISPLAY_TIMEOUT_MS = 60UL * 1000UL;
 
 // How often to re-check the timezone offset once we already have one
 // (in milliseconds). DST transitions are the main reason to recheck.
@@ -123,13 +124,6 @@ unsigned long lastMotionMs = 0;
 // long as a PIR in repeatable-trigger mode holds its output HIGH -- that's
 // a sustained level, not a stream of edges, so it needs level-polling, not
 // just an edge interrupt, to track correctly.
-//
-// This interrupt exists purely as a safety net for the one case polling
-// can't cover: a motion event that starts and ends entirely during one of
-// the sketch's rare blocking WiFi calls (boot, and ~once/24h after), when
-// loop() isn't running at all to sample the pin. The ISR does the absolute
-// minimum -- set a flag -- and loop() does the real work once it resumes.
-//volatile bool pirInterruptFlag = false;
 
 void IRAM_ATTR onPirRising() {
 	lastMotionMs = millis();
@@ -137,7 +131,6 @@ void IRAM_ATTR onPirRising() {
 		u8g2.sleepOff();
 		displayOn = true;
 	}
-	//pirInterruptFlag = true;
 }
 
 // Returns the current UTC epoch second from the free-running local clock.
@@ -317,16 +310,8 @@ void loop() {
     }
   }
 
-  // Combine the direct level read (handles sustained presence correctly —
-  // a PIR in repeatable-trigger mode holds HIGH continuously, not as a
-  // stream of edges) with the interrupt flag (catches a motion blip that
-  // started and ended entirely during a blocking WiFi call, which the
-  // level read alone could otherwise miss since loop() wasn't running to
-  // sample it).
-  bool motionNow = (digitalRead(PIR_PIN) == HIGH);
-  //pirInterruptFlag = false; // consumed either way
-
-  if (motionNow) {
+  /// handle PIR sensor and sleep mode
+  if (digitalRead(PIR_PIN) == HIGH) {
     lastMotionMs = millis();
     if (!displayOn) {
 	  u8g2.sleepOff();
@@ -341,18 +326,8 @@ void loop() {
   // sleeping for a full second regardless of how long the rest of the loop
   // body took. (long) cast handles millis() rollover correctly.
   if ((long)(millis() - nextTickMs) >= 0) {
-    //if (displayOn) {
-      // Skip the actual redraw while asleep — no point pushing a fresh
-      // frame over I2C to a display that's powered down; the local clock
-      // keeps advancing regardless, so the moment PIR wakes it back up the
-      // very next tick will draw an already-correct, up-to-date frame.
-      updateDisplay();
-    //}
-    nextTickMs += 1000; // next tick relative to the grid, not to "now" —
-                         // if we fired late, this doesn't push later ticks
-                         // out too; if we're badly behind (e.g. right after
-                         // a blocking WiFi call), the next few loop passes
-                         // catch up in quick succession instead of drifting.
+	  nextTickMs += 1000;
+	  updateDisplay();
   }
 
   delay(5); // keep the loop responsive to the tick boundary without
