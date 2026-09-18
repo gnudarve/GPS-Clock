@@ -67,7 +67,7 @@ const char* TIMEZONEDB_API_KEY = "K0P4MRQG7MB6";
 #define OLED_SDA_PIN 12 // NodeMCU D6
 
 #define PIR_PIN 13      // NodeMCU D7 — free, no boot-strap constraints
-const unsigned long DISPLAY_TIMEOUT_MS = 30000UL; // blank after 30s of no motion
+const unsigned long DISPLAY_TIMEOUT_MS = 60000UL; // blank after 30s of no motion
 
 // How often to re-check the timezone offset once we already have one
 // (in milliseconds). DST transitions are the main reason to recheck.
