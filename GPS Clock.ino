@@ -67,7 +67,7 @@ const char* TIMEZONEDB_API_KEY = "K0P4MRQG7MB6";
 #define OLED_SDA_PIN 12 // NodeMCU D6
 
 #define PIR_PIN 13      // NodeMCU D7 — free, no boot-strap constraints
-const unsigned long DISPLAY_TIMEOUT_MS = 60000UL; // blank after 30s of no motion
+const unsigned long DISPLAY_TIMEOUT_MS = 30000UL; // blank after 30s of no motion
 
 // How often to re-check the timezone offset once we already have one
 // (in milliseconds). DST transitions are the main reason to recheck.
@@ -129,10 +129,15 @@ unsigned long lastMotionMs = 0;
 // the sketch's rare blocking WiFi calls (boot, and ~once/24h after), when
 // loop() isn't running at all to sample the pin. The ISR does the absolute
 // minimum -- set a flag -- and loop() does the real work once it resumes.
-volatile bool pirInterruptFlag = false;
+//volatile bool pirInterruptFlag = false;
 
 void IRAM_ATTR onPirRising() {
-  pirInterruptFlag = true;
+	lastMotionMs = millis();
+	if (!displayOn) {
+		u8g2.sleepOff();
+		displayOn = true;
+	}
+	//pirInterruptFlag = true;
 }
 
 // Returns the current UTC epoch second from the free-running local clock.
@@ -318,13 +323,12 @@ void loop() {
   // started and ended entirely during a blocking WiFi call, which the
   // level read alone could otherwise miss since loop() wasn't running to
   // sample it).
-  bool motionNow = (digitalRead(PIR_PIN) == HIGH) || pirInterruptFlag;
-  pirInterruptFlag = false; // consumed either way
+  bool motionNow = (digitalRead(PIR_PIN) == HIGH);
+  //pirInterruptFlag = false; // consumed either way
 
   if (motionNow) {
     lastMotionMs = millis();
     if (!displayOn) {
-	  updateDisplay();
 	  u8g2.sleepOff();
       displayOn = true;
 	}
@@ -337,13 +341,13 @@ void loop() {
   // sleeping for a full second regardless of how long the rest of the loop
   // body took. (long) cast handles millis() rollover correctly.
   if ((long)(millis() - nextTickMs) >= 0) {
-    if (displayOn) {
+    //if (displayOn) {
       // Skip the actual redraw while asleep — no point pushing a fresh
       // frame over I2C to a display that's powered down; the local clock
       // keeps advancing regardless, so the moment PIR wakes it back up the
       // very next tick will draw an already-correct, up-to-date frame.
       updateDisplay();
-    }
+    //}
     nextTickMs += 1000; // next tick relative to the grid, not to "now" —
                          // if we fired late, this doesn't push later ticks
                          // out too; if we're badly behind (e.g. right after
