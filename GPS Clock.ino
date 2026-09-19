@@ -67,8 +67,7 @@ const char* TIMEZONEDB_API_KEY = "K0P4MRQG7MB6";
 #define OLED_SDA_PIN 12 // NodeMCU D6 -> wired to OLED SDA
 
 #define PIR_PIN 13      // NodeMCU D7 -> wired to PIR sensor signal
-
-const unsigned long DISPLAY_TIMEOUT_MS = 60UL * 1000UL;
+const unsigned long DISPLAY_TIMEOUT_MS = 60UL * 1000UL;  // blank after 60s of no motion
 
 // How often to re-check the timezone offset once we already have one
 // (in milliseconds). DST transitions are the main reason to recheck.
@@ -118,6 +117,23 @@ unsigned long millisAtSync = 0;
 // ---------- PIR-DRIVEN DISPLAY POWER ----------
 bool displayOn = true;
 unsigned long lastMotionMs = 0;
+
+// The main loop poll (digitalRead every pass, ~5ms cadence) is what handles
+// normal motion detection and correctly keeps re-arming the timeout for as
+// long as a PIR in repeatable-trigger mode holds its output HIGH -- that's
+// a sustained level, not a stream of edges, so it needs level-polling, not
+// just an edge interrupt, to track correctly.
+//
+// This interrupt exists purely as a safety net for the one case polling
+// can't cover: a motion event that starts and ends entirely during one of
+// the sketch's rare blocking WiFi calls (boot, and ~once/24h after), when
+// loop() isn't running at all to sample the pin. The ISR does the absolute
+// minimum -- set a flag -- and loop() does the real work once it resumes.
+volatile bool pirInterruptFlag = false;
+
+void IRAM_ATTR onPirRising() {
+	pirInterruptFlag = true;
+}
 
 // The main loop poll (digitalRead every pass, ~5ms cadence) is what handles
 // normal motion detection and correctly keeps re-arming the timeout for as
@@ -211,6 +227,7 @@ void setup() {
   // Most HC-SR501-style PIR modules idle low and pulse high on motion; no
   // internal pull needed since the module actively drives the pin.
   pinMode(PIR_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(PIR_PIN), onPirRising, RISING);
   lastMotionMs = millis(); // start "on" rather than immediately timing out
 
   Serial.println("Waiting for GPS fix...");
@@ -301,16 +318,25 @@ void loop() {
     }
   }
 
-  /// handle PIR sensor and sleep mode
-  if (digitalRead(PIR_PIN) == HIGH) {
-    lastMotionMs = millis();
-    if (!displayOn) {
-	  u8g2.sleepOff();
-      displayOn = true;
-	}
-  } else if (displayOn && (millis() - lastMotionMs > DISPLAY_TIMEOUT_MS)) {
-    u8g2.sleepOn();
-    displayOn = false;
+  // Combine the direct level read (handles sustained presence correctly —
+  // a PIR in repeatable-trigger mode holds HIGH continuously, not as a
+  // stream of edges) with the interrupt flag (catches a motion blip that
+  // started and ended entirely during a blocking WiFi call, which the
+  // level read alone could otherwise miss since loop() wasn't running to
+  // sample it).
+  bool motionNow = (digitalRead(PIR_PIN) == HIGH) || pirInterruptFlag;
+  pirInterruptFlag = false; // consumed either way
+
+  if (motionNow) {
+	  lastMotionMs = millis();
+	  if (!displayOn) {
+		  u8g2.sleepOff();
+		  displayOn = true;
+	  }
+  }
+  else if (displayOn && (millis() - lastMotionMs > DISPLAY_TIMEOUT_MS)) {
+	  u8g2.sleepOn();
+	  displayOn = false;
   }
 
   // Fire at (or very shortly after) each fixed 1000ms boundary, rather than
