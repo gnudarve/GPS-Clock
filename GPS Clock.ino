@@ -125,14 +125,6 @@ unsigned long lastMotionMs = 0;
 // a sustained level, not a stream of edges, so it needs level-polling, not
 // just an edge interrupt, to track correctly.
 
-void IRAM_ATTR onPirRising() {
-	lastMotionMs = millis();
-	if (!displayOn) {
-		u8g2.sleepOff();
-		displayOn = true;
-	}
-}
-
 // Returns the current UTC epoch second from the free-running local clock.
 // Only meaningful once localClockSynced is true.
 unsigned long getCurrentUtcEpoch() {
@@ -219,7 +211,6 @@ void setup() {
   // Most HC-SR501-style PIR modules idle low and pulse high on motion; no
   // internal pull needed since the module actively drives the pin.
   pinMode(PIR_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PIR_PIN), onPirRising, RISING);
   lastMotionMs = millis(); // start "on" rather than immediately timing out
 
   Serial.println("Waiting for GPS fix...");
