@@ -51,6 +51,7 @@
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 #include <U8g2lib.h>
+#include "tz_hourfmt.h"
 
 // ---------- USER CONFIG ----------
 const char* WIFI_SSID     = "Chandra";
@@ -63,11 +64,11 @@ const char* TIMEZONEDB_API_KEY = "K0P4MRQG7MB6";
 #define GPS_TX_PIN 5    // NodeMCU D1 -> wired to GPS RX (optional if not configuring module)
 #define GPS_BAUD   9600
 
-#define OLED_SCL_PIN 14 // NodeMCU D5 -> wired to OLED SCL
-#define OLED_SDA_PIN 12 // NodeMCU D6 -> wired to OLED SDA
+#define OLED_SCL_PIN 14 // NodeMCU D5
+#define OLED_SDA_PIN 12 // NodeMCU D6
 
-#define PIR_PIN 13      // NodeMCU D7 -> wired to PIR sensor signal
-const unsigned long DISPLAY_TIMEOUT_MS = 60UL * 1000UL;  // blank after 60s of no motion
+#define PIR_PIN 13      // NodeMCU D7 — free, no boot-strap constraints
+const unsigned long DISPLAY_TIMEOUT_MS = 30000UL; // blank after 30s of no motion
 
 // How often to re-check the timezone offset once we already have one
 // (in milliseconds). DST transitions are the main reason to recheck.
@@ -82,6 +83,7 @@ long utcOffsetSeconds = 0;
 bool isDST = false;
 String tzName = "";        // full IANA name, e.g. "America/Los_Angeles"
 String tzAbbrev = "";      // short form, e.g. "PDT" -- what we actually show
+uint8_t hourFormat = 24;   // 12 or 24, looked up from tzName via tz_hourfmt.h
 double lastLat = 0.0;
 double lastLon = 0.0;
 bool haveLocation = false;
@@ -132,14 +134,8 @@ unsigned long lastMotionMs = 0;
 volatile bool pirInterruptFlag = false;
 
 void IRAM_ATTR onPirRising() {
-	pirInterruptFlag = true;
+  pirInterruptFlag = true;
 }
-
-// The main loop poll (digitalRead every pass, ~5ms cadence) is what handles
-// normal motion detection and correctly keeps re-arming the timeout for as
-// long as a PIR in repeatable-trigger mode holds its output HIGH -- that's
-// a sustained level, not a stream of edges, so it needs level-polling, not
-// just an edge interrupt, to track correctly.
 
 // Returns the current UTC epoch second from the free-running local clock.
 // Only meaningful once localClockSynced is true.
@@ -328,23 +324,32 @@ void loop() {
   pirInterruptFlag = false; // consumed either way
 
   if (motionNow) {
-	  lastMotionMs = millis();
-	  if (!displayOn) {
-		  u8g2.sleepOff();
-		  displayOn = true;
-	  }
-  }
-  else if (displayOn && (millis() - lastMotionMs > DISPLAY_TIMEOUT_MS)) {
-	  u8g2.sleepOn();
-	  displayOn = false;
+    lastMotionMs = millis();
+    if (!displayOn) {
+      u8g2.sleepOff();
+      displayOn = true;
+    }
+  } else if (displayOn && (millis() - lastMotionMs > DISPLAY_TIMEOUT_MS)) {
+    u8g2.sleepOn();
+    displayOn = false;
   }
 
   // Fire at (or very shortly after) each fixed 1000ms boundary, rather than
   // sleeping for a full second regardless of how long the rest of the loop
   // body took. (long) cast handles millis() rollover correctly.
   if ((long)(millis() - nextTickMs) >= 0) {
-	  nextTickMs += 1000;
-	  updateDisplay();
+    if (displayOn) {
+      // Skip the actual redraw while asleep — no point pushing a fresh
+      // frame over I2C to a display that's powered down; the local clock
+      // keeps advancing regardless, so the moment PIR wakes it back up the
+      // very next tick will draw an already-correct, up-to-date frame.
+      updateDisplay();
+    }
+    nextTickMs += 1000; // next tick relative to the grid, not to "now" —
+                         // if we fired late, this doesn't push later ticks
+                         // out too; if we're badly behind (e.g. right after
+                         // a blocking WiFi call), the next few loop passes
+                         // catch up in quick succession instead of drifting.
   }
 
   delay(5); // keep the loop responsive to the tick boundary without
@@ -399,12 +404,46 @@ void updateDisplay() {
   // Epoch day 0 (1970-01-01) was a Thursday.
   int weekday = (int)(((localDays % 7) + 7 + 4) % 7);
 
-  // --- Big HH:MM:SS
+  // --- Big time, in either 24h or 12h (+AM/PM) form per hourFormat ---
+  // logisoso24_tn is a tabular-numbers-only font (no letters), so an AM/PM
+  // indicator can't go inside that string -- it's drawn separately in the
+  // small font, and the two pieces are centered together as one block.
+  int displayHour = hh;
+  bool use12h = (hourFormat == 12);
+  const char* ampm = "AM";
+  if (use12h) {
+    ampm = (hh < 12) ? "AM" : "PM";
+    displayHour = hh % 12;
+    if (displayHour == 0) displayHour = 12;
+  }
+
   char bigTime[9];
-  snprintf(bigTime, sizeof(bigTime), "%02d:%02d:%02d", hh, mm, ss);
-  u8g2.setFont(u8g2_font_logisoso28_tn);
+  if (use12h) {
+    snprintf(bigTime, sizeof(bigTime), "%d:%02d:%02d", displayHour, mm, ss);
+  } else {
+    snprintf(bigTime, sizeof(bigTime), "%02d:%02d:%02d", displayHour, mm, ss);
+  }
+
+  u8g2.setFont(u8g2_font_logisoso24_tn);
   int bigW = u8g2.getUTF8Width(bigTime);
-  u8g2.drawStr((128 - bigW) / 2, 32, bigTime);
+
+  int ampmW = 0;
+  if (use12h) {
+    u8g2.setFont(u8g2_font_6x10_tf);
+    ampmW = u8g2.getUTF8Width(ampm);
+  }
+
+  const int gap = use12h ? 4 : 0;
+  int totalW = bigW + gap + ampmW;
+  int startX = (128 - totalW) / 2;
+
+  u8g2.setFont(u8g2_font_logisoso24_tn);
+  u8g2.drawStr(startX, 29, bigTime);
+
+  if (use12h) {
+    u8g2.setFont(u8g2_font_6x10_tf);
+    u8g2.drawStr(startX + bigW + gap, 29, ampm);
+  }
 
   // --- Date line ---
   char dateLine[24];
@@ -522,6 +561,7 @@ bool parseTimezoneResponse(const String& payload) {
   tzName = doc["zoneName"].as<String>();
   utcOffsetSeconds = doc["gmtOffset"].as<long>();
   tzAbbrev = doc["abbreviation"] | "";
+  hourFormat = tzHourFormatByName(tzName); // 12 or 24, by local convention for this zone
 
   const char* dstStr = doc["dst"] | "0";
   isDST = (strcmp(dstStr, "1") == 0);
